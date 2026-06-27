@@ -24,7 +24,7 @@
     "@langchain/langgraph-checkpoint": "^1.0.4",
     "@langchain/openai": "^1.4.7",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@schema-form/flow-shared": "^1.0.0",
+    "@schema-form/flow-shared": "file:../schema-form-flow-shared",
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
     "exceljs": "^4.4.0",
