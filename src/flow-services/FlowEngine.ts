@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
-import { parseBpmnGraph, BpmnElementType, evaluateScript } from '@schema-form/flow-shared'
-import type { FlowToken, FlowInstanceStatus, RejectPolicy } from '@schema-form/flow-shared'
-import type { AssigneeType, FlowApiConfig, NodeFormDataMap, UpstreamNodeData } from '@schema-form/flow-shared'
+import { parseBpmnGraph, BpmnElementType, evaluateScript } from '@schema-platform/flow-shared'
+import type { FlowToken, FlowInstanceStatus, RejectPolicy } from '@schema-platform/flow-shared'
+import type { AssigneeType, FlowApiConfig, NodeFormDataMap, UpstreamNodeData } from '@schema-platform/flow-shared'
 
 /**
  * Evaluate an assignee expression against instance variables.
@@ -37,7 +37,7 @@ import { messageQueue } from './MessageQueue.js'
 import { notificationService } from './NotificationService.js'
 import { eventBus } from '../services/eventBus.js'
 import { logNodeStart, logNodeComplete, logNodeFail } from '../services/executionLogger.js'
-import type { RejectTargetNode } from '@schema-form/flow-shared'
+import type { RejectTargetNode } from '@schema-platform/flow-shared'
 
 export class FlowEngine {
   private async getRejectPolicy(instance: { versionId: string }, nodeId: string): Promise<RejectPolicy> {
@@ -516,7 +516,7 @@ export class FlowEngine {
 
             for (const edge of outEdges) {
               if (edge.conditionExpression && !edge.isDefault) {
-                const { evaluateExpression } = await import('@schema-form/flow-shared')
+                const { evaluateExpression } = await import('@schema-platform/flow-shared')
                 const result = evaluateExpression(edge.conditionExpression, instance.variables)
                 if (result) {
                   targetEdge = edge
@@ -821,7 +821,7 @@ export class FlowEngine {
             } else {
               // Fork behavior (diverging): evaluate all conditions, fork to every matching edge
               token.state = 'completed'
-              const { evaluateExpression } = await import('@schema-form/flow-shared')
+              const { evaluateExpression } = await import('@schema-platform/flow-shared')
               const matchingEdges = outEdges.filter((edge) => {
                 if (!edge.conditionExpression) return false
                 return evaluateExpression(edge.conditionExpression, instance.variables)

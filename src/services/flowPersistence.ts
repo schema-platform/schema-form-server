@@ -4,13 +4,13 @@
  * 实现 FlowEngine 的 FlowPersistence 接口，连接 MongoDB。
  */
 import { v4 as uuidv4 } from 'uuid'
-import type { FlowPersistence } from '@schema-form/flow-shared'
+import type { FlowPersistence } from '@schema-platform/flow-shared'
 import type {
   FlowInstanceData,
   TaskInstanceData,
   ApprovalLogEntry,
-} from '@schema-form/flow-shared'
-import type { FlowGraph } from '@schema-form/flow-shared'
+} from '@schema-platform/flow-shared'
+import type { FlowGraph } from '@schema-platform/flow-shared'
 import { FlowDefinitionModel } from '../models/FlowDefinition.js'
 import { FlowInstanceModel } from '../models/FlowInstance.js'
 import { TaskInstanceModel } from '../models/TaskInstance.js'

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import type { FlowInstanceStatus, FlowToken } from '@schema-form/flow-shared'
+import type { FlowInstanceStatus, FlowToken } from '@schema-platform/flow-shared'
 import { tenantPlugin } from '../middleware/tenantPlugin.js'
 
 export interface IFlowInstance {

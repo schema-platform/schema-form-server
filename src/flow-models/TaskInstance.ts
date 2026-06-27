@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import type { TaskInstanceStatus } from '@schema-form/flow-shared'
+import type { TaskInstanceStatus } from '@schema-platform/flow-shared'
 import { tenantPlugin } from '../middleware/tenantPlugin.js'
 
 export interface ITaskInstance {

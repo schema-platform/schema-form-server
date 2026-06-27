@@ -12,7 +12,7 @@ import { authMiddleware } from '../middleware/auth.js'
 import { FlowDefinitionModel } from '../models/FlowDefinition.js'
 import { flowPersistence } from '../services/flowPersistence.js'
 import { seedFlowData } from '../services/flowTestData.js'
-import { FlowEngine } from '@schema-form/flow-shared'
+import { FlowEngine } from '@schema-platform/flow-shared'
 
 const requireAuth = authMiddleware({ required: true })
 

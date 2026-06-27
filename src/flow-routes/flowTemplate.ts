@@ -10,7 +10,7 @@ import {
   updateFlowTemplateSchema,
   applyFlowTemplateSchema,
 } from '../flow-schemas/flowTemplateSchemas.js'
-import { BpmnElementType } from '@schema-form/flow-shared'
+import { BpmnElementType } from '@schema-platform/flow-shared'
 
 const requireAuth = authMiddleware({ required: true })
 

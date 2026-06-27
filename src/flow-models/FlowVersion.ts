@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import type { FlowGraph, FlowGraphMetadata } from '@schema-form/flow-shared'
+import type { FlowGraph, FlowGraphMetadata } from '@schema-platform/flow-shared'
 import { tenantPlugin } from '../middleware/tenantPlugin.js'
 
 export interface IFlowVersion {

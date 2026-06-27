@@ -59,8 +59,8 @@ vi.mock('../flow-services/TimerService.js', () => ({
   parseTimerValue: vi.fn(),
 }))
 
-vi.mock('@schema-form/flow-shared', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@schema-form/flow-shared')>()
+vi.mock('@schema-platform/flow-shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@schema-platform/flow-shared')>()
   return {
     ...actual,
     evaluateExpression: vi.fn(),
@@ -71,8 +71,8 @@ vi.mock('@schema-form/flow-shared', async (importOriginal) => {
 import { FlowEngine } from '../flow-services/FlowEngine.js'
 import { FlowInstanceModel } from '../flow-models/FlowInstance.js'
 import { FlowVersionModel } from '../flow-models/FlowVersion.js'
-import { BpmnElementType } from '@schema-form/flow-shared'
-import type { FlowToken } from '@schema-form/flow-shared'
+import { BpmnElementType } from '@schema-platform/flow-shared'
+import type { FlowToken } from '@schema-platform/flow-shared'
 
 // ── Helpers ──
 

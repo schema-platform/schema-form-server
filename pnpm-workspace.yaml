@@ -1,0 +1,11 @@
+allowBuilds:
+  esbuild: true
+minimumReleaseAge: 0
+minimumReleaseAgeExclude:
+  - '@schema-platform/platform-shared@1.0.0'
+  - '@schema-platform/platform-shared@1.0.1'
+  - '@schema-platform/platform-shared@1.0.2'
+  - '@schema-platform/flow-shared@1.0.0'
+  - '@schema-platform/flow-shared@1.0.1'
+onlyBuiltDependencies:
+  - esbuild
