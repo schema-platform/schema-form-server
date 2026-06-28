@@ -72,7 +72,7 @@ if (process.env.NODE_ENV !== 'development') {
     driver: 'memory',
     db: new Map(),
     duration: 60_000,
-    max: 100,
+    max: 300, // 放宽限制，避免登录重试触发 429
     id: (ctx) => ctx.ip,
     headers: {
       remaining: 'Rate-Limit-Remaining',

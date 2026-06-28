@@ -57,10 +57,10 @@ async function resolveClient(clientId: string) {
 
 /** Set the SSO session cookie on the response. */
 function setSessionCookie(ctx: Router.RouterContext, sessionToken: string): void {
-  const isProduction = process.env.NODE_ENV === 'production'
+  const isSecure = process.env.NODE_ENV === 'production' && (ctx.secure || ctx.get('X-Forwarded-Proto') === 'https')
   ctx.cookies.set(SSO_SESSION_COOKIE, sessionToken, {
     httpOnly: true,
-    secure: isProduction,
+    secure: isSecure,
     sameSite: 'lax',
     maxAge: SSO_SESSION_EXPIRY_MS,
     path: '/',
@@ -69,9 +69,10 @@ function setSessionCookie(ctx: Router.RouterContext, sessionToken: string): void
 
 /** Clear the SSO session cookie. */
 function clearSessionCookie(ctx: Router.RouterContext): void {
+  const isSecure = process.env.NODE_ENV === 'production' && (ctx.secure || ctx.get('X-Forwarded-Proto') === 'https')
   ctx.cookies.set(SSO_SESSION_COOKIE, '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     sameSite: 'lax',
     maxAge: 0,
     path: '/',

@@ -123,7 +123,8 @@ router.post('/login', validate(loginSchema), async (ctx) => {
   recordLoginLog(tenantId, username, 'success', '', ctx)
 
   // 设置 SSO 会话 cookie
-  const isSecure = process.env.NODE_ENV === 'production' || ctx.secure
+  // nginx 终止 SSL 后 ctx.secure 为 false，需要检查 X-Forwarded-Proto
+  const isSecure = process.env.NODE_ENV === 'production' && (ctx.secure || ctx.get('X-Forwarded-Proto') === 'https')
   ctx.cookies.set(SSO_SESSION_COOKIE, sessionToken, {
     httpOnly: true,
     secure: isSecure,
