@@ -123,10 +123,10 @@ router.post('/login', validate(loginSchema), async (ctx) => {
   recordLoginLog(tenantId, username, 'success', '', ctx)
 
   // 设置 SSO 会话 cookie
-  // 注意：secure 只在 HTTPS 下启用，当前服务器是 HTTP 所以关闭
+  const isSecure = process.env.NODE_ENV === 'production' || ctx.secure
   ctx.cookies.set(SSO_SESSION_COOKIE, sessionToken, {
     httpOnly: true,
-    secure: false,
+    secure: isSecure,
     sameSite: 'lax',
     maxAge: SSO_SESSION_EXPIRY_MS,
     path: '/',
@@ -187,10 +187,24 @@ router.post('/refresh', validate(refreshSchema), async (ctx) => {
     { expiresIn: ACCESS_TOKEN_EXPIRY },
   )
 
+  const newRefreshToken = jwt.sign(
+    {
+      id: user._id,
+      username: user.username,
+      roles: user.roles,
+      tenantId: user.tenantId,
+      deptId: user.deptId,
+      tokenType: 'refresh' as const,
+    },
+    JWT_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRY },
+  )
+
   ctx.body = {
     success: true,
     data: {
       accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
       tokenType: 'Bearer',
       expiresIn: 900,
     },
