@@ -12,7 +12,7 @@
 ### 架构规则
 - **路由聚合**：所有 API 路由在 `src/` 下按模块组织（schema、auth、data、dict、options、mock、docs、health、flow）
 - **中间件栈**：errorHandler → helmet → bodyParser → CORS → routes
-- **数据模型**：FormSchema 使用 UUID string（非 ObjectId），`json` 字段为 Mixed 类型存储 schema 树
+- **数据模型**：所有模型使用 MongoDB 原生 ObjectId 作为主键，`json` 字段为 Mixed 类型存储 schema 树
 
 ### 分层规范
 1. 路由 → `src/` 下各模块目录
@@ -23,6 +23,9 @@
 
 ### 环境规则
 - **gh CLI 已认证**：`gh` 已登录、`GITHUB_TOKEN` 环境变量已就绪，禁止检查 token、禁止询问用户设置
+
+### 代码质量规则
+- **禁止跳过问题**：遇到任何报错、警告、异常，必须找到根因并修复，不能以"预存问题""之前就有""不影响运行"为由跳过。每个问题都要记录原因和修复方式
 
 ## 迭代规则
 
