@@ -43,7 +43,7 @@ const flowDefinitionSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: {
       transform(_doc: unknown, ret: Record<string, unknown>) {
-        ret.id = ret._id
+        ret.id = String(ret._id)
         delete ret._id
         delete ret.__v
       },

@@ -1,6 +1,6 @@
 # schema-form-server 能力总览
 
-> 最后更新: 2026-06-27
+> 最后更新: 2026-06-28
 
 ## 一、项目定位
 
@@ -149,4 +149,4 @@
 2. **多租户原生**: 从中间件到模型层的全链路租户隔离
 3. **事件驱动**: EventBus 解耦 Schema 发布、表单提交、Webhook 触发
 4. **AI-First**: LangGraph 多 Agent 架构，支持流式输出和人机协作
-5. **双模部署**: 同时支持传统 HTTP Server 和 Serverless
+5. **ObjectId 主键**: 所有模型使用 MongoDB 原生 ObjectId，数据引用一致性好

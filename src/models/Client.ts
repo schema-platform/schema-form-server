@@ -19,7 +19,7 @@ export interface IClient {
 
 const clientSchema = new mongoose.Schema(
   {
-    clientId: { type: String, required: true, unique: true, index: true },
+    clientId: { type: String, required: true, unique: true },
     name: { type: String, required: true },
     secret: { type: String, required: true },
     redirectUris: { type: [String], default: [] },
@@ -32,7 +32,7 @@ const clientSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: {
       transform(_doc: unknown, ret: Record<string, unknown>) {
-        ret.id = ret._id
+        ret.id = String(ret._id)
         delete ret._id
         delete ret.__v
         // secret 不应暴露给客户端

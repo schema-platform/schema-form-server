@@ -15,7 +15,7 @@ export interface ISSOSession {
 const ssoSessionSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true, index: true },
-    sessionToken: { type: String, required: true, unique: true, index: true },
+    sessionToken: { type: String, required: true, unique: true },
     userAgent: { type: String, default: '' },
     ip: { type: String, default: '' },
     expiresAt: { type: Date, required: true },
@@ -25,7 +25,7 @@ const ssoSessionSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: {
       transform(_doc: unknown, ret: Record<string, unknown>) {
-        ret.id = ret._id
+        ret.id = String(ret._id)
         delete ret._id
         delete ret.__v
       },

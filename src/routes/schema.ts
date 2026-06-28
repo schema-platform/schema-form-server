@@ -612,7 +612,10 @@ router.post('/:id/publish', requireAuth, requirePermission('schema:publish'), as
   }
 
   const now = new Date()
-  const newPublishId = uuidv4()
+
+  // 复用已有 publishId，保证发布链接稳定；首次发布才生成新 ID
+  const existing = await PublishedSchemaModel.findOne({ sourceId: draft.editId })
+  const publishId = existing?.publishId ?? uuidv4()
 
   const published = await PublishedSchemaModel.findOneAndUpdate(
     { sourceId: draft.editId },
@@ -622,7 +625,7 @@ router.post('/:id/publish', requireAuth, requirePermission('schema:publish'), as
         type: draft.type,
         json: publishJson,
         thumbnail: draft.thumbnail,
-        publishId: newPublishId,
+        publishId,
         version: publishVersion,
         publishedAt: now,
       },

@@ -23,7 +23,7 @@ const permissionSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: {
       transform(_doc: unknown, ret: Record<string, unknown>) {
-        ret.id = ret._id
+        ret.id = String(ret._id)
         delete ret._id
         delete ret.__v
       },
@@ -32,7 +32,7 @@ const permissionSchema = new mongoose.Schema(
 )
 
 permissionSchema.index({ module: 1 })
-permissionSchema.index({ code: 1 })
+// code 已有 unique: true 自动建索引，无需重复声明
 
 permissionSchema.plugin(tenantPlugin)
 

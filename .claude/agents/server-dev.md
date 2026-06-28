@@ -57,7 +57,7 @@ src/
 ### 代码规范
 - **路由聚合**: 所有 API 在 `src/` 下按模块组织
 - **分层规范**: 路由 → 中间件 → 服务 → 模型
-- **数据模型**: FormSchema 使用 UUID string (非 ObjectId)，`json` 字段为 Mixed 类型
+- **数据模型**: 所有模型使用 MongoDB 原生 ObjectId 作为主键，`json` 字段为 Mixed 类型
 - **数据库变更**: 必须提供迁移脚本 (`src/migrations/`)
 - **新增 API**: 需同步更新文档 (`src/docs/`)
 - **环境变量变更**: 需同步更新 `.env.example`
@@ -114,6 +114,7 @@ pnpm start        # node dist/index.js
 pnpm test         # vitest run
 pnpm db:up        # 启动 MongoDB Docker 容器
 pnpm db:seed      # 种子数据
+pnpm db:migrate-id # UUID _id → ObjectId 迁移
 ```
 
 ## 环境变量

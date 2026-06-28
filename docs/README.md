@@ -7,13 +7,16 @@
 ```bash
 # 启动本地开发（需要 Docker MongoDB）
 pnpm db:up
-pnpm dev:server
+pnpm dev
 
 # 种子数据
 pnpm db:seed
 
+# 数据迁移（UUID → ObjectId）
+pnpm db:migrate-id
+
 # 构建
-pnpm build:server
+pnpm build
 ```
 
 ## 文档目录

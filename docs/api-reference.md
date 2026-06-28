@@ -1,6 +1,6 @@
 # API 接口文档
 
-> 最后更新: 2026-06-27
+> 最后更新: 2026-06-28
 >
 > Base URL: `http://localhost:3001`
 >
@@ -1431,6 +1431,14 @@ Provider 列表及策略。
 ### `POST /api/ai/runtime/approval-suggestion`
 
 审批建议（当前: 返回通用建议）。
+
+---
+
+## 附录: ID 格式说明
+
+所有资源的 `_id` 字段均为 MongoDB ObjectId（24 位十六进制字符串），如 `685faa86c32e0839b4f9de6f`。
+
+路由参数中的 ID 校验统一使用 `mongoose.Types.ObjectId.isValid(id)`。
 
 ---
 

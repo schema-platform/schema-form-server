@@ -52,7 +52,7 @@ const schemaEmbeddingDef = new mongoose.Schema(
   {
     tenantId: { type: String, default: '000000', index: true },
     schemaId: { type: String, required: true, index: true },
-    editId: { type: String, required: true, unique: true, index: true },
+    editId: { type: String, required: true, unique: true },
     name: { type: String, required: true },
     type: { type: String, enum: ['form', 'search_list'], default: 'form' },
     contentHash: { type: String, required: true },
