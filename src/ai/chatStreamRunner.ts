@@ -19,6 +19,7 @@ import {
 } from './services/conversationService.js'
 import type { AIMessage as ConversationMessage } from './graph/state.js'
 import { createVersion } from './services/versionService.js'
+import { loadDocumentsForChat, summarizeDocument } from './services/documentService.js'
 import { FormSchemaModel } from '../models/FormSchema.js'
 import { FlowVersionModel } from '../flow-models/FlowVersion.js'
 import { PromptVersionModel } from './models/promptVersion.js'
@@ -102,6 +103,13 @@ export interface ChatRequest {
     currentFlow?: { nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }
     selectedWidget?: { id: string; type: string; field?: string; label?: string }
     editorMode?: 'edit' | 'preview'
+    documentAttachments?: Array<{
+      documentId: string
+      filename: string
+      mimetype: string
+      size: number
+      excerpt?: string
+    }>
   }
   mentions?: Array<{ id: string; type: string; name: string }>
 }
@@ -128,6 +136,7 @@ export function executeChatStream(
   send: (event: Record<string, unknown>) => void,
   onDone: (conversationId: string) => void,
   onError?: (error: Error) => void,
+  userId = 'anonymous',
 ): StreamHandle {
   const graphAbort = new AbortController()
   let done = false
@@ -135,7 +144,7 @@ export function executeChatStream(
   const promise = runChatStream(request, send, graphAbort.signal, (convoId) => {
     done = true
     onDone(convoId)
-  }, onError)
+  }, onError, userId)
 
   return {
     promise,
@@ -151,6 +160,7 @@ async function runChatStream(
   signal: AbortSignal,
   onDone: (conversationId: string) => void,
   onError?: (error: Error) => void,
+  userId = 'anonymous',
 ): Promise<void> {
   const { conversationId, message, context } = request
 
@@ -217,10 +227,60 @@ async function runChatStream(
     currentFlow = context.currentFlow
   }
 
+  const documentAttachments = context.documentAttachments ?? []
+  let llmMessage = message
+  let loadedSummaries: Array<{
+    documentId: string
+    filename: string
+    summary: Record<string, unknown>
+  }> = []
+
+  if (documentAttachments.length > 0) {
+    const documentIds = documentAttachments.map((a) => a.documentId)
+    const docs = await loadDocumentsForChat(documentIds, userId)
+    const summaryResults = []
+    for (const att of documentAttachments) {
+      const existing = docs.find((d) => d.id === att.documentId)
+      if (existing?.summary) {
+        summaryResults.push({
+          documentId: existing.id,
+          filename: existing.filename,
+          summary: existing.summary,
+        })
+        continue
+      }
+      try {
+        const generated = await summarizeDocument(att.documentId, userId)
+        if (generated) summaryResults.push(generated)
+      } catch (err) {
+        logger.warn({ msg: '[chat] document summarize failed', documentId: att.documentId, err })
+      }
+    }
+    if (summaryResults.length > 0) {
+      send({ type: 'document_summaries', summaries: summaryResults })
+      loadedSummaries = summaryResults.map((s) => ({
+        documentId: s.documentId,
+        filename: s.filename,
+        summary: s.summary as unknown as Record<string, unknown>,
+      }))
+    }
+    const docBlocks = docs.map((doc) => {
+      const header = `[文档: ${doc.filename}]`
+      const summaryPart = doc.summary
+        ? `\n已有摘要：${doc.summary.summary}`
+        : ''
+      return `${header}${summaryPart}\n\n${doc.text.slice(0, 8000)}`
+    })
+    if (docBlocks.length > 0) {
+      llmMessage = `${docBlocks.join('\n\n---\n\n')}\n\n---\n\n用户消息：${message}`
+    }
+  }
+
   // ── Persist user message ──
   const userMessage: ConversationMessage = {
     role: 'user',
     content: message,
+    attachments: documentAttachments.length > 0 ? documentAttachments : undefined,
     timestamp: new Date(),
   }
   await appendMessage(convo._id, userMessage)
@@ -228,7 +288,7 @@ async function runChatStream(
   // ── Build LangGraph input state ──
   const threadId = convo._id
   const graphInput = {
-    messages: [new HumanMessage(message)],
+    messages: [new HumanMessage(llmMessage)],
     context: {
       source: context.source as 'editor' | 'flow' | 'page' | 'standalone',
       schemaId: context.schemaId,
@@ -686,6 +746,9 @@ async function runChatStream(
     }
     if (accumulatedSchema) assistantMessage.schema = accumulatedSchema as Record<string, unknown>[]
     if (accumulatedFlow) assistantMessage.flow = accumulatedFlow as Record<string, unknown>
+    if (loadedSummaries.length > 0) {
+      assistantMessage.documentSummaries = loadedSummaries
+    }
 
     await appendMessage(convo._id, assistantMessage)
 
@@ -774,10 +837,10 @@ export function executeResumeStream(
   let done = false
 
   const promise = (async () => {
+    let doneSent = false
     try {
       const config = { configurable: { thread_id: threadId } }
       const command = new Command({ resume: resumeValue })
-      let doneSent = false
 
       const eventStream = graph.streamEvents(command, {
         version: 'v2',

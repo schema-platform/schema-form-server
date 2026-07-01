@@ -14,6 +14,7 @@ import {
   AgentWorkflowExecutionModel,
 } from '../models/agentWorkflow.js'
 import { executeAgentWorkflow } from './agentWorkflowExecutor.js'
+import { ensureWebhookSecretsInGraph } from './agentWorkflowWebhookUtils.js'
 import { logger } from '../../utils/logger.js'
 import { docId, refId, toObjectId } from '../../utils/objectId.js'
 
@@ -222,12 +223,15 @@ export async function publishAgentWorkflow(id: string, userId: string) {
   // 复用已有 publishId，保证发布标识稳定；首次发布才生成新 UUID
   const publishId = workflow.publishId ?? uuidv4()
   const publishVersion = workflow.version || generateVersion()
-  const publishGraph = workflow.draftGraph
+  const graphWithSecrets = ensureWebhookSecretsInGraph(
+    workflow.draftGraph as Record<string, unknown>,
+  )
 
+  workflow.draftGraph = graphWithSecrets
   workflow.status = 'published'
   workflow.publishId = publishId
   workflow.publishedVersion = publishVersion
-  workflow.publishedGraph = publishGraph
+  workflow.publishedGraph = graphWithSecrets
   await workflow.save()
 
   return {
@@ -306,6 +310,7 @@ export async function startAgentWorkflowExecution(
   workflowId: string,
   userId: string,
   input: Record<string, unknown> = {},
+  opts: { trigger?: 'manual' | 'webhook' | 'chat' } = {},
 ) {
   const workflow = await AgentWorkflowModel.findOne({ _id: workflowId, createdBy: userId })
   if (!workflow) return null
@@ -324,7 +329,7 @@ export async function startAgentWorkflowExecution(
     versionId,
     version,
     status: 'running',
-    trigger: 'manual',
+    trigger: opts.trigger ?? 'manual',
     nodeRecords: [],
     triggeredBy: userId,
   })
@@ -406,6 +411,55 @@ export async function resumeAgentWorkflowExecution(
   })
 
   return getAgentWorkflowExecution(executionId, userId)
+}
+
+interface WebhookGraphNode {
+  id: string
+  type: string
+  data?: {
+    webhookPath?: string
+    webhookMethod?: string
+    webhookSecret?: string
+  }
+}
+
+interface WebhookGraph {
+  entryNodeId?: string
+  nodes?: WebhookGraphNode[]
+}
+
+function normalizeWebhookPath(path: string): string {
+  const trimmed = path.trim()
+  if (!trimmed || trimmed === '/') return '/'
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+}
+
+export async function findPublishedWorkflowByWebhook(path: string, method: string) {
+  const normalizedPath = normalizeWebhookPath(path)
+  const normalizedMethod = method.toUpperCase()
+
+  const workflows = await AgentWorkflowModel.find({ status: 'published' }).lean()
+  for (const workflow of workflows) {
+    const graph = workflow.publishedGraph as WebhookGraph | null
+    if (!graph?.nodes?.length) continue
+
+    for (const node of graph.nodes) {
+      if (node.type !== 'webhook-trigger') continue
+      const nodePath = normalizeWebhookPath(String(node.data?.webhookPath ?? '/hook'))
+      const nodeMethod = String(node.data?.webhookMethod ?? 'POST').toUpperCase()
+      if (nodePath === normalizedPath && nodeMethod === normalizedMethod) {
+        return {
+          workflowId: String(workflow._id),
+          workflowName: workflow.name as string,
+          createdBy: workflow.createdBy as string,
+          entryNodeId: graph.entryNodeId ?? node.id,
+          nodeId: node.id,
+          webhookSecret: node.data?.webhookSecret?.trim() || undefined,
+        }
+      }
+    }
+  }
+  return null
 }
 
 // 保持向后兼容（旧测试引用）

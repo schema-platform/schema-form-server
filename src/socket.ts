@@ -31,11 +31,15 @@ export function initSocket(httpServer: HttpServer): Server {
   })
 
   // JWT authentication middleware for Socket.io
-  io.use((socket, next) => {
-    // Skip auth in development
+  io.use(async (socket, next) => {
     if (process.env.NODE_ENV !== 'production') {
-      socket.data.user = { id: 'dev', username: 'dev', roles: [], tenantId: '000000' }
-      next()
+      try {
+        const { resolveDevelopmentUser } = await import('./utils/devUser.js')
+        socket.data.user = await resolveDevelopmentUser()
+        next()
+      } catch (err) {
+        next(err instanceof Error ? err : new Error(String(err)))
+      }
       return
     }
 

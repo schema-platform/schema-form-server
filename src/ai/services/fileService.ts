@@ -1,7 +1,7 @@
 /**
  * File processing service — OCR and text extraction.
  *
- * All processing happens in memory (no filesystem writes).
+ * 解析在内存完成；原文件持久化由 documentFileStorage 负责。
  */
 
 import { PDFParse } from 'pdf-parse'
@@ -18,11 +18,16 @@ export interface ProcessedFile {
   size: number
   /** Extracted text content */
   text: string
-  /** Base64 data URL for images (used for multimodal LLM input) */
+  extractionMethod: 'ocr' | 'pdf' | 'docx' | 'txt' | 'empty'
+  /** Base64 data URL for images (ephemeral) */
   dataUrl?: string
 }
 
 // ---- Constants ----
+
+export const VISION_OCR_MODEL = process.env.AI_VISION_OCR_MODEL || 'deepseek-v4-flash'
+/** 文本摘要 / 对话默认模型（与 OCR 视觉模型分离） */
+export const DOCUMENT_TEXT_MODEL = process.env.AI_DOCUMENT_TEXT_MODEL || 'deepseek-v4-flash'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -50,7 +55,7 @@ async function performOCR(base64Image: string, mimeType: string): Promise<string
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'deepseek-v4-flash',
+      model: VISION_OCR_MODEL,
       messages: [
         {
           role: 'user',
@@ -117,7 +122,7 @@ export async function processFile(
     throw new Error(`File size exceeds maximum limit of ${MAX_FILE_SIZE / 1024 / 1024}MB`)
   }
 
-  // Image processing — OCR
+  // Image processing — OCR via vision model (flash), downstream LLM only sees text
   if (ALLOWED_IMAGE_TYPES.has(mimetype)) {
     const base64 = buffer.toString('base64')
     const dataUrl = `data:${mimetype};base64,${base64}`
@@ -128,6 +133,7 @@ export async function processFile(
       mimetype,
       size: buffer.length,
       text,
+      extractionMethod: text.trim() ? 'ocr' : 'empty',
       dataUrl,
     }
   }
@@ -151,11 +157,20 @@ export async function processFile(
     text = extractPlainText(buffer)
   }
 
+  const extractionMethod = !text.trim()
+    ? 'empty'
+    : mimetype === 'application/pdf'
+      ? 'pdf'
+      : mimetype === 'text/plain'
+        ? 'txt'
+        : 'docx'
+
   return {
     filename,
     mimetype,
     size: buffer.length,
     text,
+    extractionMethod,
   }
 }
 

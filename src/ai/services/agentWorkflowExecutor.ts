@@ -12,10 +12,13 @@ import {
   buildEditorSystemPrompt,
   buildFlowSystemPrompt,
   buildPageSystemPrompt,
+  ROUTER_SYSTEM_PROMPT,
 } from '@schema-platform/ai-shared/promptBuilder'
 import { normalizeToolName } from '@schema-platform/ai-shared/toolNames'
 import { getToolSync, ensureToolsReady, getToolsByNames } from '../tools/registry.js'
 import { getMetadata } from '../tools/toolHandlers.js'
+import { extractJsonFromResponse } from '../graph/agentBase.js'
+import { getDocumentWithText, reprocessDocumentFromStorage } from './documentService.js'
 import type { StructuredTool } from '@langchain/core/tools'
 
 interface WorkflowGraphNode {
@@ -38,6 +41,9 @@ interface WorkflowGraphNode {
       required?: boolean
     }>
     inheritUpstreamQuestions?: boolean
+    documentSource?: 'documentId' | 'inputField'
+    documentId?: string
+    inputField?: string
   }
 }
 
@@ -311,6 +317,30 @@ function resolveHitlQuestions(
 
 const AGENT_MAX_TOOL_ROUNDS = 3
 
+const EXPERT_NODE_AGENT_MAP: Record<string, string> = {
+  'agent-editor': 'editor',
+  'agent-flow': 'flow',
+  'agent-page': 'page',
+  'agent-general': 'general',
+}
+
+const VALID_AGENT_TYPES = new Set(['editor', 'flow', 'page', 'general'])
+
+function resolveAgentTypeFromNode(node: WorkflowGraphNode): string | null {
+  const mapped = EXPERT_NODE_AGENT_MAP[node.type]
+  if (mapped) return mapped
+  if (node.type === 'agent') {
+    const t = node.data?.agentType ?? 'general'
+    return t === 'auto' ? null : t
+  }
+  return null
+}
+
+function normalizeDetectedAgent(value: unknown): string {
+  const agent = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return VALID_AGENT_TYPES.has(agent) ? agent : 'general'
+}
+
 function getAgentSystemPrompt(agentType: string): string {
   const metadata = getMetadata()
   switch (agentType) {
@@ -360,10 +390,58 @@ function getAgentTools(agentType: string): StructuredTool[] {
 
 function autoDetectAgentType(input: unknown, ctx: RuntimeContext): string {
   const text = `${typeof input === 'string' ? input : JSON.stringify(input ?? '')} ${JSON.stringify(ctx.lastOutput ?? '')}`.toLowerCase()
-  if (/流程|审批|流转|bpmn|flow|gate|节点/.test(text)) return 'flow'
-  if (/页面|布局|page|layout|landing/.test(text)) return 'page'
-  if (/表单|schema|form|字段|组件|widget/.test(text)) return 'editor'
+  if (/流程|审批|流转|bpmn|flow|gate|节点|工作流/.test(text)) return 'flow'
+  if (/页面|布局|page|layout|landing|仪表盘|统计|列表|详情|表格/.test(text)) return 'page'
+  if (/表单|schema|form|字段|组件|widget|输入框/.test(text)) return 'editor'
   return 'general'
+}
+
+async function detectAgentIntent(
+  input: unknown,
+  ctx: RuntimeContext,
+): Promise<{ agent: string; source: 'keyword' | 'llm' }> {
+  const keywordAgent = autoDetectAgentType(input, ctx)
+  if (keywordAgent !== 'general') {
+    return { agent: keywordAgent, source: 'keyword' }
+  }
+
+  const userText = typeof input === 'string'
+    ? input
+    : JSON.stringify(input ?? ctx.lastOutput ?? ctx.input ?? {})
+  const contextHint = ctx.lastOutput != null
+    ? `\n\n[上游节点输出]\n${JSON.stringify(ctx.lastOutput)}`
+    : ''
+
+  try {
+    const llm = await getLLM({ temperature: 0, maxTokens: 256 })
+    const response = await llm.invoke([
+      new SystemMessage(ROUTER_SYSTEM_PROMPT),
+      new HumanMessage(`${userText}${contextHint}`),
+    ])
+    const raw = typeof response.content === 'string'
+      ? response.content
+      : JSON.stringify(response.content)
+    const parsed = extractJsonFromResponse(raw)
+    if (parsed) {
+      if (parsed.target === 'chain' && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        const first = parsed.steps[0] as Record<string, unknown>
+        return { agent: normalizeDetectedAgent(first.agent), source: 'llm' }
+      }
+      if (parsed.target) {
+        return { agent: normalizeDetectedAgent(parsed.target), source: 'llm' }
+      }
+      if (parsed.agent) {
+        return { agent: normalizeDetectedAgent(parsed.agent), source: 'llm' }
+      }
+    }
+  } catch (err) {
+    logger.warn({
+      msg: '[agentWorkflow] intent LLM detection failed, falling back to keyword',
+      err: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  return { agent: keywordAgent, source: 'keyword' }
 }
 
 async function dispatchAgent(
@@ -374,7 +452,8 @@ async function dispatchAgent(
   // 自动识别：根据输入内容判断使用哪个专家
   let resolvedType = agentType
   if (agentType === 'auto') {
-    resolvedType = autoDetectAgentType(input, ctx)
+    const detected = await detectAgentIntent(input, ctx)
+    resolvedType = detected.agent
   }
 
   const systemPrompt = getAgentSystemPrompt(resolvedType)
@@ -436,12 +515,95 @@ async function runNode(
 ): Promise<{ output: unknown; branch?: 'true' | 'false'; wait?: boolean }> {
   const data = node.data ?? {}
 
+  if (node.type === 'tool' || node.type.startsWith('tool-')) {
+    const toolName = data.toolName?.trim() ?? ''
+    if (!toolName) {
+      return { output: { error: '未选择工具' }, branch: undefined }
+    }
+    const result = await dispatchTool(toolName, data.toolArgs ?? {}, ctx)
+    return { output: result.output }
+  }
+
+  if (node.type.startsWith('agent-') || node.type === 'agent') {
+    const agentInput = data.prompt?.trim() ? resolveTemplate(data.prompt, ctx) : ctx.lastOutput
+
+    if (node.type === 'agent-intent') {
+      const { agent: detectedAgent, source } = await detectAgentIntent(agentInput, ctx)
+      const result = await dispatchAgent(detectedAgent, agentInput, ctx)
+      const output = result.output as Record<string, unknown>
+      return {
+        output: {
+          ...output,
+          detectedAgent,
+          intentSource: source,
+          agent: detectedAgent,
+        },
+      }
+    }
+
+    const agentType = resolveAgentTypeFromNode(node) ?? data.agentType ?? 'general'
+    const result = await dispatchAgent(agentType, agentInput, ctx)
+    return { output: result.output }
+  }
+
   switch (node.type) {
     case 'manual-trigger':
       return { output: { ...ctx.input } }
 
     case 'webhook-trigger':
       return { output: { ...ctx.input } }
+
+    case 'document-parse': {
+      const source = data.documentSource ?? 'inputField'
+      let documentId = ''
+      if (source === 'documentId') {
+        documentId = resolveTemplate(data.documentId ?? '', ctx).trim()
+      } else {
+        const field = data.inputField?.trim() || 'documentId'
+        const inputObj = ctx.input as Record<string, unknown>
+        const lastObj = (ctx.lastOutput ?? {}) as Record<string, unknown>
+        const body = inputObj.body as Record<string, unknown> | undefined
+        const raw = lastObj[field] ?? inputObj[field] ?? body?.[field]
+        documentId = raw != null ? String(raw) : ''
+      }
+      if (!documentId) {
+        return { output: { error: '未指定文档 ID' } }
+      }
+      const doc = await getDocumentWithText(documentId)
+      if (!doc) {
+        return { output: { error: `文档不存在: ${documentId}` } }
+      }
+
+      let text = doc.text as string
+      let chunks = doc.chunks
+      let extractionMethod = doc.extractionMethod
+      if (!text?.trim() && doc.storagePath && doc.uploadedBy) {
+        const reparsed = await reprocessDocumentFromStorage(
+          documentId,
+          doc.uploadedBy as string,
+        )
+        if (reparsed) {
+          text = reparsed.text as string
+          chunks = reparsed.chunks
+          extractionMethod = reparsed.extractionMethod
+        }
+      }
+
+      return {
+        output: {
+          documentId,
+          filename: doc.filename,
+          mimetype: doc.mimetype,
+          size: doc.size,
+          text,
+          chunks,
+          summary: doc.summary,
+          extractionMethod,
+          hasOriginalFile: !!doc.storagePath,
+          textLength: text?.length ?? 0,
+        },
+      }
+    }
 
     case 'llm': {
       const prompt = resolveTemplate(data.prompt ?? '', ctx)
@@ -458,22 +620,6 @@ async function runNode(
         ? response.content
         : JSON.stringify(response.content)
       return { output: { text: content } }
-    }
-
-    case 'agent': {
-      const agentType = data.agentType ?? 'general'
-      const agentInput = data.prompt?.trim() ? resolveTemplate(data.prompt, ctx) : ctx.lastOutput
-      const result = await dispatchAgent(agentType, agentInput, ctx)
-      return { output: result.output }
-    }
-
-    case 'tool': {
-      const toolName = data.toolName?.trim() ?? ''
-      if (!toolName) {
-        return { output: { error: '未选择工具' }, branch: undefined }
-      }
-      const result = await dispatchTool(toolName, data.toolArgs ?? {}, ctx)
-      return { output: result.output }
     }
 
     case 'if': {

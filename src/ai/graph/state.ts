@@ -37,6 +37,18 @@ export interface AIMessage {
   /** Optional structured payload attached to an assistant message. */
   schema?: Record<string, unknown>[]
   flow?: Record<string, unknown>
+  attachments?: Array<{
+    documentId: string
+    filename: string
+    mimetype: string
+    size: number
+    excerpt?: string
+  }>
+  documentSummaries?: Array<{
+    documentId: string
+    filename: string
+    summary: Record<string, unknown>
+  }>
   timestamp: Date
 }
 

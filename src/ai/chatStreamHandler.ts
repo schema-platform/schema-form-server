@@ -28,7 +28,11 @@ export function registerChatHandlers(socket: Socket, _io: Server): void {
   const socketId = socket.id
 
   // ── chat:send — 发送消息，启动流式响应 ──
-  socket.on('chat:send', async (data: ChatRequest) => {
+  socket.on('chat:send', async (data: ChatRequest & {
+    context?: ChatRequest['context'] & {
+      documentAttachments?: ChatRequest['context']['documentAttachments']
+    }
+  }) => {
     logger.info({ msg: `[WS:chat] chat:send from ${socketId}`, conversationId: data.conversationId ?? 'new' })
 
     try {
@@ -61,6 +65,8 @@ export function registerChatHandlers(socket: Socket, _io: Server): void {
         activeStreams.delete(socketId)
         socket.leave(`chat:${threadId}`)
       },
+      undefined,
+      (socket.data.user as { id?: string } | undefined)?.id ?? 'anonymous',
     )
 
     activeStreams.set(socketId, handle)

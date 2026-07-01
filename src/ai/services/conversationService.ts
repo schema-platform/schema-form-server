@@ -44,6 +44,18 @@ interface AIConversationMessage {
   toolCalls?: Array<{ name: string; arguments: Record<string, unknown>; result?: unknown }>
   schema?: Record<string, unknown>[]
   flow?: Record<string, unknown>
+  attachments?: Array<{
+    documentId: string
+    filename: string
+    mimetype: string
+    size: number
+    excerpt?: string
+  }>
+  documentSummaries?: Array<{
+    documentId: string
+    filename: string
+    summary: Record<string, unknown>
+  }>
   timestamp: Date
   feedback?: 'positive' | 'negative' | null
   feedbackComment?: string
@@ -77,6 +89,18 @@ const messageSchema = new mongoose.Schema<AIConversationMessage>(
     }],
     schema: { type: mongoose.Schema.Types.Mixed },
     flow: { type: mongoose.Schema.Types.Mixed },
+    attachments: [{
+      documentId: { type: String, required: true },
+      filename: { type: String, required: true },
+      mimetype: { type: String, required: true },
+      size: { type: Number, required: true },
+      excerpt: { type: String },
+    }],
+    documentSummaries: [{
+      documentId: { type: String, required: true },
+      filename: { type: String, required: true },
+      summary: { type: mongoose.Schema.Types.Mixed, required: true },
+    }],
     timestamp: { type: Date, default: Date.now },
     feedback: { type: String, enum: ['positive', 'negative', null], default: null },
     feedbackComment: { type: String },

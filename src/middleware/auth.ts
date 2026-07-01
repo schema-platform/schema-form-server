@@ -95,23 +95,19 @@ export function authMiddleware(options?: { required?: boolean }): Middleware {
           }
         } catch { /* token invalid, use dev fallback */ }
       }
-      // Dev fallback: try to use the admin user from database
+      // Dev fallback: 数据库真实用户（默认 admin），与 WebSocket 一致
       try {
-        const { UserModel } = await import('../models/User.js')
-        const adminUser = await UserModel.findOne({ username: 'admin' }).lean() as Record<string, unknown> | null
-        if (adminUser) {
-          ctx.state.user = {
-            id: (adminUser._id as { toString(): string }).toString(),
-            username: adminUser.username as string,
-            roles: (adminUser.roles as string[]) || [],
-            tenantId: (adminUser.tenantId as string) || '000000',
-            deptId: (adminUser.deptId as string) || null,
-          }
-        } else {
-          ctx.state.user = { id: 'dev', username: 'dev', roles: [], tenantId: '000000', deptId: null }
+        const { resolveDevelopmentUser } = await import('../utils/devUser.js')
+        ctx.state.user = await resolveDevelopmentUser()
+      } catch (err) {
+        ctx.status = 503
+        ctx.body = {
+          success: false,
+          error: {
+            message: err instanceof Error ? err.message : 'Development auth user not available',
+          },
         }
-      } catch {
-        ctx.state.user = { id: 'dev', username: 'dev', roles: [], tenantId: '000000', deptId: null }
+        return
       }
       syncTenantFromUser(ctx)
       await next()
