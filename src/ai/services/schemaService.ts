@@ -225,8 +225,6 @@ async function getWidgetTypeSets(): Promise<{ VALID_TYPES: Set<string>; CONTAINE
 // 模糊搜索（Jaccard 相似度）
 // ────────────────────────────────────────────
 
-import { extractTokens, extractTokensFromSchema, jaccardSimilarity } from '../tools/toolHandlers.js'
-
 export async function fuzzySearchSchemas(query: string, limit = 5): Promise<{
   success: boolean
   data: { total: number; schemas: Array<{ id: string; name: string; type: string; status: string; score: number }> }

@@ -7,7 +7,6 @@ export async function initDefaultTenant(): Promise<void> {
   if (existing) return
 
   await TenantModel.create({
-    _id: DEFAULT_TENANT_ID,
     name: '默认租户',
     code: 'default',
     status: 'active',

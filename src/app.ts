@@ -62,6 +62,7 @@ validateApiKey()
 connectRedis()
 
 const app = new Koa()
+app.proxy = true
 
 // --- Middleware stack ---
 app.use(errorHandler)

@@ -304,6 +304,8 @@ async function runChatStream(
       id: threadId,
       conversationId: convo._id,
       currentAgent: 'router' as const,
+      nodeExecutionCount: 0,
+      maxNodeExecutions: 25,
     },
     interaction: {
       clarificationRequest: null as string | null,

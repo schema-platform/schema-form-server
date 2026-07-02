@@ -10,7 +10,7 @@
  *   // safeTool.invoke 行为同原工具，但异常被捕获返回 { success: false, error }
  */
 
-import type { StructuredTool } from '@langchain/core/tools'
+import type { StructuredTool, ToolRunnableConfig } from '@langchain/core/tools'
 import { logger } from '../../utils/logger.js'
 
 /**
@@ -23,7 +23,7 @@ export function wrapTool(tool: StructuredTool, toolName?: string): StructuredToo
 
   const wrappedInvoke = async (input: Record<string, unknown>, options?: unknown): Promise<string> => {
     try {
-      return await originalInvoke(input, options)
+      return await originalInvoke(input, options as ToolRunnableConfig | undefined)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       logger.error({ msg: `[tool:${name}] 执行失败`, error: message })
